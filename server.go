@@ -70,6 +70,22 @@ func getExpense(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Err{Message: "can't scan expenses:" + err.Error()})
 	}
 }
+func createExpenses(c echo.Context) error {
+
+	exp := Expenses{}
+	err := c.Bind(&exp)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, Err{Message: err.Error()})
+	}
+
+	row := db.QueryRow("INSERT INTO expenses (title, amount , note ,tags) values ($1, $2, $3 , $4)  RETURNING id", exp.Title, exp.Amount, exp.Note, pq.Array(&exp.Tags))
+	err = row.Scan(&exp.ID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, exp)
+}
 
 func main() {
 	var err error
@@ -107,6 +123,7 @@ func main() {
 
 	e.GET("/expenses", getExpenses)
 	e.GET("/expenses/:id", getExpense)
+	e.POST("/expenses", createExpenses)
 
 	log.Fatal(e.Start(":2565"))
 }
