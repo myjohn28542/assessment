@@ -87,6 +87,45 @@ func createExpenses(c echo.Context) error {
 	return c.JSON(http.StatusCreated, exp)
 }
 
+func updateExpenses(c echo.Context) error {
+
+	id := c.Param("id")
+
+	exp := Expenses{}
+	err := c.Bind(&exp)
+	if err != nil {
+
+		return c.JSON(http.StatusBadRequest, Err{Message: err.Error()})
+	}
+
+	stmt, err := db.Prepare("UPDATE expenses SET title=$2, amount=$3 , note=$4 ,tags=$5 WHERE id=$1;")
+
+	if err != nil {
+
+		log.Fatal("can't prepare statment update", err)
+	}
+
+	if _, err := stmt.Exec(id, exp.Title, exp.Amount, exp.Note, pq.Array(&exp.Tags)); err != nil {
+		log.Fatal("error execute update ", err)
+	}
+	stmt, err = db.Prepare("SELECT id, title, amount , note ,tags FROM expenses WHERE id = $1")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't prepare query expenses:" + err.Error()})
+	}
+	row := stmt.QueryRow(id)
+
+	err = row.Scan(&exp.ID, &exp.Title, &exp.Amount, &exp.Note, pq.Array(&exp.Tags))
+	switch err {
+	case sql.ErrNoRows:
+		return c.JSON(http.StatusNotFound, Err{Message: "expenses not found"})
+	case nil:
+		return c.JSON(http.StatusOK, exp)
+	default:
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't scan expenses:" + err.Error()})
+	}
+
+}
+
 func main() {
 	var err error
 	url := "postgres://bvmnqtid:TYwIzLz0EPRo-v7Ztb8kYZ-PFjdUCNqE@john.db.elephantsql.com/bvmnqtid"
@@ -124,6 +163,6 @@ func main() {
 	e.GET("/expenses", getExpenses)
 	e.GET("/expenses/:id", getExpense)
 	e.POST("/expenses", createExpenses)
-
+	e.PUT("/expenses/:id", updateExpenses)
 	log.Fatal(e.Start(":2565"))
 }
