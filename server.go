@@ -50,6 +50,27 @@ func getExpenses(c echo.Context) error {
 	return c.JSON(http.StatusOK, expenses)
 }
 
+func getExpense(c echo.Context) error {
+	id := c.Param("id")
+	stmt, err := db.Prepare("SELECT id, title, amount , note ,tags FROM expenses WHERE id = $1")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't prepare query expenses :" + err.Error()})
+	}
+
+	row := stmt.QueryRow(id)
+	exp := Expenses{}
+	// u.Title, u.Amount, u.Note
+	err = row.Scan(&exp.ID, &exp.Title, &exp.Amount, &exp.Note, pq.Array(&exp.Tags))
+	switch err {
+	case sql.ErrNoRows:
+		return c.JSON(http.StatusNotFound, Err{Message: "expenses not found"})
+	case nil:
+		return c.JSON(http.StatusOK, exp)
+	default:
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't scan expenses:" + err.Error()})
+	}
+}
+
 func main() {
 	var err error
 	url := "postgres://bvmnqtid:TYwIzLz0EPRo-v7Ztb8kYZ-PFjdUCNqE@john.db.elephantsql.com/bvmnqtid"
@@ -85,6 +106,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	e.GET("/expenses", getExpenses)
+	e.GET("/expenses/:id", getExpense)
 
 	log.Fatal(e.Start(":2565"))
 }
