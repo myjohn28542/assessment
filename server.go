@@ -50,6 +50,23 @@ func getExpenses(c echo.Context) error {
 	return c.JSON(http.StatusOK, expenses)
 }
 
+func createExpenses(c echo.Context) error {
+
+	exp := Expenses{}
+	err := c.Bind(&exp)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, Err{Message: err.Error()})
+	}
+
+	row := db.QueryRow("INSERT INTO expenses (title, amount , note ,tags) values ($1, $2, $3 , $4)  RETURNING id", exp.Title, exp.Amount, exp.Note, pq.Array(&exp.Tags))
+	err = row.Scan(&exp.ID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, exp)
+}
+
 func main() {
 	var err error
 	url := "postgres://bvmnqtid:TYwIzLz0EPRo-v7Ztb8kYZ-PFjdUCNqE@john.db.elephantsql.com/bvmnqtid"
@@ -85,6 +102,7 @@ func main() {
 	e.Use(middleware.Recover())
 
 	e.GET("/expenses", getExpenses)
+	e.POST("/expenses", createExpenses)
 
 	log.Fatal(e.Start(":2565"))
 }
